@@ -18,6 +18,8 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import base64
 import ast
+import dns.rrset
+import dns.name
 
 def generate_aes_key(password, salt):
     kdf = PBKDF2HMAC(
@@ -76,6 +78,7 @@ dns_records = {
         ),
     },
    
+    # Add more records as needed (see assignment instructions!
     'safebank.com.': {
         dns.rdatatype.A: '192.168.1.102'
     },
@@ -100,7 +103,7 @@ dns_records = {
 def run_dns_server():
     # Create a UDP socket and bind it to the local IP address (what unique IP address is used here, similar to webserver lab) and port (the standard port for DNS)
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # Research this
-    server_socket.bind(('127.0.0.1', 8053))
+    server_socket.bind(('127.0.0.1', 53))
 
     while True:
         try:
@@ -125,10 +128,10 @@ def run_dns_server():
 
                 if qtype == dns.rdatatype.MX:
                     for pref, server in answer_data:
-                        rdata_list.append(MX(dns.rdataclass.IN, dns.rdatatype.MX, pref, server))
+                        rdata_list.append(MX(dns.rdataclass.IN, dns.rdatatype.MX, pref, dns.name.from_text(server)))
                 elif qtype == dns.rdatatype.SOA:
                     mname, rname, serial, refresh, retry, expire, minimum = answer_data # What is the record format? See dns_records dictionary. Assume we handle @, Class, TTL elsewhere. Do some research on SOA Records
-                    rdata = SOA(dns.rdataclass.IN, dns.rdatatype.SOA, mname, rname, serial, refresh, retry, expire, minimum) # follow format from previous line
+                    rdata = SOA(dns.rdataclass.IN, dns.rdatatype.SOA, dns.name.from_text(mname), dns.name.from_text(rname), serial, refresh, retry, expire, minimum) # follow format from previous line
                     rdata_list.append(rdata)
                 else:
                     if isinstance(answer_data, str):
@@ -171,7 +174,3 @@ if __name__ == '__main__':
     #print("Encrypted Value:", encrypted_value)
     #print("Decrypted Value:", decrypted_value)
 
-if __name__ == '__main__':
-    run_dns_server_user()
-    #print("Encrypted:", encrypted_value)
-    #print("Decrypted:", decrypted_value)
