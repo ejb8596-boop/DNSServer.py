@@ -138,6 +138,8 @@ def run_dns_server():
                     if isinstance(answer_data, str):
                         rdata_list = [dns.rdata.from_text(dns.rdataclass.IN, qtype, answer_data)]
                     elif qtype == dns.rdatatype.TXT and isinstance(answer_data[0], bytes):
+                        rdata_list = [dns.rdata.from_text(dns.rdataclass.IN, qtype, str(answer_data[0]))]
+
                         # ✅ FIX: convert bytes TXT data to string for DNS response
                         rdata_list = [dns.rdata.from_text(dns.rdataclass.IN, qtype, answer_data[0].decode('utf-8'))]
                     else:
