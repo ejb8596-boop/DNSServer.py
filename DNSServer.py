@@ -45,13 +45,12 @@ def decrypt_with_aes(encrypted_data, password, salt):
     decrypted_data = f.decrypt(encrypted_data) #call the Fernet decrypt method
     return decrypted_data.decode('utf-8')
 
-
 salt = b'Tandon' # Remember it should be a byte-object
 password = 'ejb8596@nyu.edu'
 input_string = "AlwaysWatching"
 
 encrypted_value = encrypt_with_aes(input_string, password, salt) # exfil function
-# decrypted_value = decrypt_with_aes(encrypted_value, password, salt)  # exfil function (REMOVED for exfiltration rule)
+# decrypted_value = decrypt_with_aes(encrypted_value, password, salt)  # exfil function
 
 # For future use    
 def generate_sha256_hash(input_string):
@@ -79,7 +78,7 @@ dns_records = {
         ),
     },
    
-    # Add more records as needed (see assignment instructions!
+    # Add more records as needed (see assignment instructions!)
     'safebank.com.': {
         dns.rdatatype.A: '192.168.1.102'
     },
@@ -94,7 +93,7 @@ dns_records = {
     },
     'nyu.edu.': {
         dns.rdatatype.A: '192.168.1.106',
-        dns.rdatatype.TXT: (str(encrypted_value),),  # store as string using str() as requested
+        dns.rdatatype.TXT: (str(encrypted_value),),  # store as string (cast only)
         dns.rdatatype.MX: [(10, 'mxa-00256a01.gslb.pphosted.com.')],
         dns.rdatatype.AAAA: '2001:0db8:85a3:0000:0000:8a2e:0373:7312',
         dns.rdatatype.NS: 'ns1.nyu.edu.',
@@ -124,7 +123,6 @@ def run_dns_server():
             if qname in dns_records and qtype in dns_records[qname]:
                 # Retrieve the data for the record and create an appropriate `rdata` object for it
                 answer_data = dns_records[qname][qtype]
-
                 rdata_list = []
 
                 if qtype == dns.rdatatype.MX:
@@ -137,12 +135,19 @@ def run_dns_server():
                 else:
                     if isinstance(answer_data, str):
                         rdata_list = [dns.rdata.from_text(dns.rdataclass.IN, qtype, answer_data)]
-                    # handle TXT stored as str(encrypted_value) which looks like "b'...'"
-                    elif qtype == dns.rdatatype.TXT and isinstance(answer_data[0], str) and answer_data[0].startswith("b'") and answer_data[0].endswith("'"):
-                        inner = answer_data[0][2:-1]  # strip the leading b' and trailing '
-                        rdata_list = [dns.rdata.from_text(dns.rdataclass.IN, qtype, inner)]
                     else:
-                        rdata_list = [dns.rdata.from_text(dns.rdataclass.IN, qtype, data) for data in answer_data]
+                        rdata_list = []
+                        for data in answer_data:
+                            if isinstance(data, (bytes, bytearray)):
+                                text_for_dnspython = data.decode('utf-8')
+                                rdata_list.append(dns.rdata.from_text(dns.rdataclass.IN, qtype, text_for_dnspython))
+                            elif isinstance(data, str) and data.startswith("b'") and data.endswith("'"):
+                                inner = data[2:-1]
+                                rdata_list.append(dns.rdata.from_text(dns.rdataclass.IN, qtype, inner))
+                            elif isinstance(data, str):
+                                rdata_list.append(dns.rdata.from_text(dns.rdataclass.IN, qtype, data))
+                            else:
+                                rdata_list.append(dns.rdata.from_text(dns.rdataclass.IN, qtype, str(data)))
                 for rdata in rdata_list:
                     response.answer.append(dns.rrset.RRset(question.name, dns.rdataclass.IN, qtype))
                     response.answer[-1].add(rdata)
@@ -153,9 +158,9 @@ def run_dns_server():
             # Send the response back to the client using the `server_socket.sendto` method and put the response to_wire(), return to the addr you received from
             server_socket.sendto(response.to_wire(), addr)
         except KeyboardInterrupt:
+            print('\nExiting...')
             server_socket.close()
             sys.exit(0)
-
 
 def run_dns_server_user():
     print("Input 'q' and hit 'enter' to quit")
@@ -173,11 +178,11 @@ def run_dns_server_user():
     input_thread.start()
     run_dns_server()
 
-
 if __name__ == '__main__':
     run_dns_server_user()
     #print("Encrypted Value:", encrypted_value)
     #print("Decrypted Value:", decrypted_value)
+
 
 
 
