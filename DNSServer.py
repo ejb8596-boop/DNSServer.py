@@ -12,7 +12,7 @@ import signal
 import os
 import sys
 import hashlib
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import base64
@@ -40,18 +40,29 @@ def encrypt_with_aes(input_string, password, salt):
     return encrypted_data
 
 
+# FIXED: decrypt accepts bytes OR a string (coming from TXT record)
 def decrypt_with_aes(encrypted_data, password, salt):
+    # if someone passed the decoded txt string, convert back to bytes
+    if isinstance(encrypted_data, str):
+        encrypted_data = encrypted_data.encode('utf-8')
+
     key = generate_aes_key(password, salt)
     f = Fernet(key)
-    decrypted_data = f.decrypt(encrypted_data)
-    return decrypted_data.decode('utf-8')
+    try:
+        decrypted_data = f.decrypt(encrypted_data)
+        return decrypted_data.decode('utf-8')
+    except InvalidToken as e:
+        # clearer error msg for debugging but don't leak secret
+        print("decrypt error! Type:", type(e), "Value:", "Something is wrong with how you are storing the token")
+        return None
 
 
 salt = b'Tandon'
-password = 'your_nyu_email@nyu.edu'   # replace with your nyu email
+password = 'ejb8596@nyu.edu'   # replace if you need different nyu email
 input_string = "AlwaysWatching"
 
 encrypted_value = encrypt_with_aes(input_string, password, salt)
+# We test decrypt right away using the bytes returned by encrypt
 decrypted_value = decrypt_with_aes(encrypted_value, password, salt)
 
 
@@ -82,91 +93,7 @@ dns_records = {
 
     # assignment ones
     'safebank.com.': {
-        dns.rdatatype.A: '192.168.1.102'
-    },
-    'google.com.': {
-        dns.rdatatype.A: '192.168.1.103'
-    },
-    'legitsite.com.': {
-        dns.rdatatype.A: '192.168.1.104'
-    },
-    'yahoo.com.': {
-        dns.rdatatype.A: '192.168.1.105'
-    },
-    'nyu.edu.': {
-        dns.rdatatype.A: '192.168.1.106',
-        dns.rdatatype.TXT: (encrypted_value.decode('utf-8'),),
-        dns.rdatatype.MX: [(10, 'mxa-00256a01.gslb.pphosted.com.')],
-        dns.rdatatype.AAAA: '2001:0db8:85a3:0000:0000:8a2e:0373:7312',
-        dns.rdatatype.NS: 'ns1.nyu.edu.',
-    },
-}
-
-
-def run_dns_server():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.bind(('127.0.0.1', 53))
-
-    while True:
-        try:
-            data, addr = s.recvfrom(1024)
-            req = dns.message.from_wire(data)
-            resp = dns.message.make_response(req)
-
-            question = req.question[0]
-            qname = question.name.to_text()
-            qtype = question.rdtype
-
-            if qname in dns_records and qtype in dns_records[qname]:
-                info = dns_records[qname][qtype]
-                rdata_list = []
-
-                if qtype == dns.rdatatype.MX:
-                    for pref, server in info:
-                        rdata_list.append(MX(dns.rdataclass.IN, dns.rdatatype.MX, pref, dns.name.from_text(server)))
-                elif qtype == dns.rdatatype.SOA:
-                    mname, rname, serial, refresh, retry, expire, minimum = info
-                    r = SOA(dns.rdataclass.IN, dns.rdatatype.SOA,
-                            dns.name.from_text(mname),
-                            dns.name.from_text(rname),
-                            serial, refresh, retry, expire, minimum)
-                    rdata_list.append(r)
-                else:
-                    if isinstance(info, str):
-                        rdata_list = [dns.rdata.from_text(dns.rdataclass.IN, qtype, info)]
-                    else:
-                        rdata_list = [dns.rdata.from_text(dns.rdataclass.IN, qtype, d) for d in info]
-
-                for rdata in rdata_list:
-                    rr = dns.rrset.RRset(question.name, dns.rdataclass.IN, qtype)
-                    rr.add(rdata)
-                    resp.answer.append(rr)
-
-            resp.flags |= 1 << 10
-            print("responding to:", qname)
-            s.sendto(resp.to_wire(), addr)
-
-        except KeyboardInterrupt:
-            print("closing server")
-            s.close()
-            sys.exit(0)
-
-
-def run_dns_server_user():
-    print("type q and press enter to quit")
-    print("DNS server running...")
-
-    def user_input():
-        while True:
-            cmd = input()
-            if cmd.lower() == 'q':
-                print("quitting...")
-                os.kill(os.getpid(), signal.SIGINT)
-
-    t = threading.Thread(target=user_input)
-    t.daemon = True
-    t.start()
-    run_dns_server()
+        dns
 
 
 if __name__ == '__main__':
