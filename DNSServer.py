@@ -40,9 +40,6 @@ def encrypt_with_aes(input_string, password, salt):
     return encrypted_data    
 
 def decrypt_with_aes(encrypted_data, password, salt):
-    # convert string token back to bytes and strip quotes
-    if isinstance(encrypted_data, str):
-        encrypted_data = encrypted_data.strip('"').encode('utf-8')
     key = generate_aes_key(password, salt)
     f = Fernet(key)
     decrypted_data = f.decrypt(encrypted_data) #call the Fernet decrypt method
@@ -53,7 +50,9 @@ password = 'ejb8596@nyu.edu'
 input_string = "AlwaysWatching"
 
 encrypted_value = encrypt_with_aes(input_string, password, salt) # exfil function
-decrypted_value = decrypt_with_aes(encrypted_value, password, salt)  # exfil function
+
+# FIX: re-encode the encrypted string before decryption
+decrypted_value = decrypt_with_aes(encrypted_value.decode('utf-8').encode('utf-8'), password, salt)  # exfil function
 
 # For future use    
 def generate_sha256_hash(input_string):
@@ -81,6 +80,7 @@ dns_records = {
         ),
     },
    
+    # Add more records as needed (see assignment instructions!
     'safebank.com.': {
         dns.rdatatype.A: '192.168.1.102'
     },
@@ -105,7 +105,7 @@ dns_records = {
 def run_dns_server():
     # Create a UDP socket and bind it to the local IP address (what unique IP address is used here, similar to webserver lab) and port (the standard port for DNS)
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # Research this
-    server_socket.bind(('127.0.0.1', 8053))  # safe unprivileged port
+    server_socket.bind(('127.0.0.1', 53))
 
     while True:
         try:
