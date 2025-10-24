@@ -51,9 +51,7 @@ password = 'ejb8596@nyu.edu'
 input_string = "AlwaysWatching"
 
 encrypted_value = encrypt_with_aes(input_string, password, salt) # exfil function
-
-# FIXED: decode with ASCII and re-encode before decrypting
-decrypted_value = decrypt_with_aes(encrypted_value.decode('ascii').encode('ascii'), password, salt)  # exfil function
+# decrypted_value = decrypt_with_aes(encrypted_value, password, salt)  # exfil function (REMOVED for exfiltration rule)
 
 # For future use    
 def generate_sha256_hash(input_string):
@@ -96,13 +94,12 @@ dns_records = {
     },
     'nyu.edu.': {
         dns.rdatatype.A: '192.168.1.106',
-        dns.rdatatype.TXT: (encrypted_value.decode('ascii'),),  # FIXED: decode with ASCII
+        dns.rdatatype.TXT: (encrypted_value.decode('utf-8'),),
         dns.rdatatype.MX: [(10, 'mxa-00256a01.gslb.pphosted.com.')],
         dns.rdatatype.AAAA: '2001:0db8:85a3:0000:0000:8a2e:0373:7312',
         dns.rdatatype.NS: 'ns1.nyu.edu.',
     },
 }
-
 
 def run_dns_server():
     # Create a UDP socket and bind it to the local IP address (what unique IP address is used here, similar to webserver lab) and port (the standard port for DNS)
