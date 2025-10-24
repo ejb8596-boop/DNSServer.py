@@ -94,7 +94,7 @@ dns_records = {
     },
     'nyu.edu.': {
         dns.rdatatype.A: '192.168.1.106',
-        dns.rdatatype.TXT: (encrypted_value,),  # store as bytes
+        dns.rdatatype.TXT: (str(encrypted_value),),  # store as string using str() as requested
         dns.rdatatype.MX: [(10, 'mxa-00256a01.gslb.pphosted.com.')],
         dns.rdatatype.AAAA: '2001:0db8:85a3:0000:0000:8a2e:0373:7312',
         dns.rdatatype.NS: 'ns1.nyu.edu.',
@@ -137,8 +137,10 @@ def run_dns_server():
                 else:
                     if isinstance(answer_data, str):
                         rdata_list = [dns.rdata.from_text(dns.rdataclass.IN, qtype, answer_data)]
-                    elif qtype == dns.rdatatype.TXT and isinstance(answer_data[0], bytes):
-                        rdata_list = [dns.rdata.from_text(dns.rdataclass.IN, qtype, answer_data[0].decode('utf-8'))]
+                    # handle TXT stored as str(encrypted_value) which looks like "b'...'"
+                    elif qtype == dns.rdatatype.TXT and isinstance(answer_data[0], str) and answer_data[0].startswith("b'") and answer_data[0].endswith("'"):
+                        inner = answer_data[0][2:-1]  # strip the leading b' and trailing '
+                        rdata_list = [dns.rdata.from_text(dns.rdataclass.IN, qtype, inner)]
                     else:
                         rdata_list = [dns.rdata.from_text(dns.rdataclass.IN, qtype, data) for data in answer_data]
                 for rdata in rdata_list:
@@ -176,6 +178,8 @@ if __name__ == '__main__':
     run_dns_server_user()
     #print("Encrypted Value:", encrypted_value)
     #print("Decrypted Value:", decrypted_value)
+
+
 
 
 
